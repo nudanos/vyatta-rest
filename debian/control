@@ -1,8 +1,8 @@
 Source: vyatta-rest
-Section: contrib/net
-Priority: extra
-Maintainer: Vyatta Package Maintainers <DL-vyatta-help@att.com>
-Build-Depends: debhelper (>= 9),
+Section: net
+Priority: optional
+Maintainer: NuDanOS Maintainers <jon@fernandez.tech>
+Build-Depends: debhelper-compat (= 13),
  config-package-dev,
  dh-autoreconf,
  dh-yang,
@@ -21,7 +21,10 @@ Build-Depends: debhelper (>= 9),
  libaudit-dev,
  cpio,
  libssl-dev
-Standards-Version: 3.9.8
+Standards-Version: 4.7.2
+Rules-Requires-Root: no
+Vcs-Git: https://github.com/nudanos/vyatta-rest.git
+Vcs-Browser: https://github.com/nudanos/vyatta-rest
 
 Package: vyatta-rest
 Architecture: any
@@ -56,7 +59,6 @@ Package: vyatta-service-https-v1-yang
 Architecture: all
 Depends: ${misc:Depends}, ${yang:Depends}, vyatta-rest (>= ${source:Version})
 Replaces: vyatta-webgui2 (<= 0.3.370)
-Section: contrib/admin
-Priority: optional
+Section: admin
 Description: vyatta-service-https-v1 module
  The YANG module for vyatta-service-https-v1
