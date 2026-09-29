@@ -19,3 +19,7 @@ override_dh_fixperms:
 	chmod --reference /etc/cron.daily/lighttpd \
 		$(CURDIR)/debian/vyatta-rest/etc/cron.daily/lighttpd.vyatta
 	dh_fixperms
+
+# Started on demand by configd, as the init script was; never at boot.
+override_dh_installsystemd:
+	dh_installsystemd --name=vyatta-webgui-chunker-aux --no-enable --no-start

@@ -1,0 +1,15 @@
+[Unit]
+Description=Vyatta Webgui chunker and REST FastCGI service
+Documentation=file:///etc/init.d/vyatta-webgui-chunker-aux
+After=network.target remote-fs.target nss-lookup.target
+
+# configd starts and stops this service when HTTPS is configured
+# (tmplscripts/service/https/configd_end.sh); it is not enabled at boot.
+# The init script starts two daemons (chunker2 and the REST FastCGI app),
+# so this runs it as systemd-sysv-generator did, without SysV support.
+[Service]
+Type=forking
+RemainAfterExit=yes
+GuessMainPID=no
+ExecStart=/etc/init.d/vyatta-webgui-chunker-aux start
+ExecStop=/etc/init.d/vyatta-webgui-chunker-aux stop
