@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+case "$1" in
+    remove|purge)
+        # written or edited into lighttpd's conf-enabled by postinst
+        rm -f /etc/lighttpd/conf-enabled/10-cgi.conf \
+              /etc/lighttpd/conf-enabled/10-ssl.conf \
+              /etc/lighttpd/conf-enabled/10-fastcgi.conf
+        ;;
+esac
+#DEBHELPER#
+exit 0
