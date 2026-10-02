@@ -28,8 +28,8 @@ Vcs-Browser: https://github.com/nudanos/vyatta-rest
 
 Package: vyatta-rest
 Architecture: any
-Breaks: vyatta-op (<< 1.0), vyatta-webgui2 (<< 1.0),
-Replaces: vyatta-webgui, vyatta-op (<< 1.0), vyatta-webgui2 (<< 1.0),
+Breaks: vyatta-op (<< 1.0), vyatta-webgui2 (<< 1.0)
+Replaces: vyatta-webgui, vyatta-op (<< 1.0), vyatta-webgui2 (<< 1.0)
 Provides: ${diverted-files}
 Conflicts: ${diverted-files}
 Depends: ${shlibs:Depends},
@@ -43,9 +43,9 @@ Depends: ${shlibs:Depends},
  vyatta-cfg (>= 0.104.24),
  vyatta-op,
  vyatta-restclient-perl,
- vyatta-service-dhcp-client,
  vyatta-system (>= 1.6.1),
  spawn-fcgi
+Recommends: vyatta-service-dhcp-client
 Description: Vyatta Rest interface
  This package provides the Vyatta Rest interface.
 
