@@ -6,6 +6,10 @@ case "$1" in
         rm -f /etc/lighttpd/conf-enabled/10-cgi.conf \
               /etc/lighttpd/conf-enabled/10-ssl.conf \
               /etc/lighttpd/conf-enabled/10-fastcgi.conf
+        # the TLS module load postinst appended to lighttpd.conf
+        if [ -f /etc/lighttpd/lighttpd.conf ]; then
+            sed -i '/^server.modules += ( "mod_openssl" )$/d' /etc/lighttpd/lighttpd.conf
+        fi
         ;;
 esac
 #DEBHELPER#

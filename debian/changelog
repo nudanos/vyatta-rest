@@ -1,3 +1,11 @@
+vyatta-rest (1.11) trixie; urgency=medium
+
+  * Depend on lighttpd-mod-openssl and load mod_openssl by name: Debian 13
+    ships lighttpd's TLS separately, so 'service https' left lighttpd unable
+    to start (dlopen mod_openssl.so failed). Postrm removes the load line
+
+ -- NuDanOS Maintainers <jon@fernandez.tech>  Tue, 06 Oct 2026 06:46:00 -0700
+
 vyatta-rest (1.10) trixie; urgency=medium
 
   * postrm: remove the lighttpd conf-enabled files postinst writes.

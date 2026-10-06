@@ -54,6 +54,13 @@ if ! grep -q '\[::\]' /etc/lighttpd/lighttpd.conf; then
   } >> /etc/lighttpd/lighttpd.conf
 fi
 
+# load TLS by name at top level: Debian 13 ships it as lighttpd-mod-openssl and
+# lighttpd will stop loading it implicitly; 10-ssl.conf cannot load it because
+# it is also included inside a $SERVER["socket"] conditional
+if ! grep -q '"mod_openssl"' /etc/lighttpd/lighttpd.conf; then
+  echo 'server.modules += ( "mod_openssl" )' >> /etc/lighttpd/lighttpd.conf
+fi
+
 # enable syslog for lighttpd
 if ! grep -q '^server.errorlog-use-syslog' /etc/lighttpd/lighttpd.conf; then
   {
