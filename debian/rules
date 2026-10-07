@@ -21,6 +21,7 @@ override_dh_auto_test:
 	dh_auto_test
 	sh tests/openssl-consistent.sh
 	sh tests/fcgi-socket-consistent.sh
+	sh tests/no-dangling-cstr.sh
 
 override_dh_fixperms:
 	chmod --reference /etc/cron.daily/lighttpd \

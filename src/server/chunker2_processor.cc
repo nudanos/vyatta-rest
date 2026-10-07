@@ -148,9 +148,11 @@ ChunkerProcessor::writer(string token, const string &cmd,int (&cp)[2], string us
 	tokenizeOpCmd(opmodecmd, opcmdarr);
 
 	char **cmdarr = new char*[4];
-	cmdarr[0] = (char *)(string("/opt/vyatta/bin/opc").c_str());
-	cmdarr[1] = (char *)(string("-op").c_str());
-	cmdarr[2] = (char *)(string("run-from-env").c_str());
+	// string literals: a pointer into a temporary std::string is dead
+	// by the time execve() reads it
+	cmdarr[0] = const_cast<char *>("/opt/vyatta/bin/opc");
+	cmdarr[1] = const_cast<char *>("-op");
+	cmdarr[2] = const_cast<char *>("run-from-env");
 	cmdarr[3] = NULL;
 
 	// Create json args to pass in via environment

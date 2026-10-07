@@ -1,3 +1,10 @@
+vyatta-rest (1.13) trixie; urgency=medium
+
+  * chunker2: build opc's argv from string literals; pointers into temporary
+    strings were garbage under GCC 14 -O2 and every REST op command failed.
+
+ -- NuDanOS Maintainers <jon@fernandez.tech>  Tue, 06 Oct 2026 22:42:24 -0700
+
 vyatta-rest (1.12) trixie; urgency=medium
 
   * Move the REST FastCGI socket to /run/vyatta-rest/fcgi.socket: Debian 13's
