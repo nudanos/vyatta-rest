@@ -1,3 +1,11 @@
+vyatta-rest (1.12) trixie; urgency=medium
+
+  * Move the REST FastCGI socket to /run/vyatta-rest/fcgi.socket: Debian 13's
+    lighttpd.service runs with PrivateTmp=yes, so lighttpd could not see
+    /tmp/fcgi.socket and every /rest/ request answered 503.
+
+ -- NuDanOS Maintainers <jon@fernandez.tech>  Tue, 06 Oct 2026 20:07:00 -0700
+
 vyatta-rest (1.11) trixie; urgency=medium
 
   * Depend on lighttpd-mod-openssl and load mod_openssl by name: Debian 13

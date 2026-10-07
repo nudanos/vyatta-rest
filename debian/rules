@@ -15,10 +15,12 @@ override_dh_auto_configure:
 override_dh_auto_install:
 	dh_auto_install -- DESTDIR=$(CURDIR)/debian/vyatta-rest
 
-# lighttpd TLS: the dependency and the module load travel with ssl.engine
+# lighttpd TLS: the dependency and the module load travel with ssl.engine;
+# the FastCGI socket must be outside lighttpd.service's private /tmp
 override_dh_auto_test:
 	dh_auto_test
 	sh tests/openssl-consistent.sh
+	sh tests/fcgi-socket-consistent.sh
 
 override_dh_fixperms:
 	chmod --reference /etc/cron.daily/lighttpd \
