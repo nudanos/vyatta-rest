@@ -1,2 +1,17 @@
 # vyatta-rest
 provides the vyatta rest interface
+
+## Legacy session storage
+
+The REST startup script creates `/var/run/gui` as root with mode `0700`.
+The FastCGI reader and the Perl `SessionKey.pm` issuer use root-owned regular
+files with mode `0600` and one hard link. The lock file remains in place
+between operations. Valid sessions in a store that meets these requirements
+keep their existing header and cookie formats. Newly issued session IDs use
+16 hexadecimal characters drawn from eight random bytes.
+
+On an upgrade from the former shared runtime directory, reboot to create
+fresh runtime state. Startup refuses an existing directory with unsafe
+ownership or permissions. Sessions stored in that directory must be issued
+again. The Perl issuer now requires an already privileged caller. A legacy
+issuer running as an ordinary web-server account cannot use the session store.

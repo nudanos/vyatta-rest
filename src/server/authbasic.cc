@@ -11,7 +11,6 @@
 
 #include <libaudit.h>
 #include <iostream>
-#include <openssl/bio.h>
 #include <openssl/evp.h>
 #include <security/pam_appl.h>
 #include <security/pam_misc.h>
@@ -74,22 +73,56 @@ conv_fun(int num_msg, const struct pam_message **msg, struct pam_response **resp
  *
  *
  **/
-static void
-base64Decode(unsigned char* pIn, int inLen, unsigned char* pOut,
-             int& outLen)
+static bool
+has_basic_scheme(const string &auth)
 {
-	// create a memory buffer containing base64 encoded data
-	BIO* bmem = BIO_new_mem_buf((void*)pIn, inLen);
+	const size_t size = Rest::AUTH_BASIC.size();
+	return auth.size() > size && auth[size] == ' ' &&
+	       auth.compare(0, size, Rest::AUTH_BASIC) == 0;
+}
 
-	// push a Base64 filter so that reading from buffer decodes it
-	BIO *bioCmd = BIO_new(BIO_f_base64());
-	// we don't want newlines
-	BIO_set_flags(bioCmd, BIO_FLAGS_BASE64_NO_NL);
-	bmem = BIO_push(bioCmd, bmem);
+bool
+AuthBasic::parse_credentials(const string &auth, string &username, string &password)
+{
+	if (!has_basic_scheme(auth))
+		return false;
 
-	int finalLen = BIO_read(bmem, (void*)pOut, outLen);
-	BIO_free_all(bmem);
-	outLen = finalLen;
+	const size_t max_decoded = 1024;
+	const size_t max_encoded = 4 * ((max_decoded + 2) / 3);
+	const size_t offset = Rest::AUTH_BASIC.size() + 1;
+	const size_t size = auth.size() - offset;
+	if (size == 0 || size > max_encoded || size % 4 != 0)
+		return false;
+
+	size_t padding = 0;
+	if (auth.back() == '=') {
+		padding = auth[auth.size() - 2] == '=' ? 2 : 1;
+	}
+	const char *alphabet =
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+	if (auth.find_first_not_of(alphabet, offset) !=
+	    (padding ? auth.size() - padding : string::npos))
+		return false;
+
+	// EVP_DecodeBlock writes three bytes per quartet, including padding.
+	unsigned char decoded[3 * (max_encoded / 4)];
+	const int result = EVP_DecodeBlock(decoded,
+		reinterpret_cast<const unsigned char *>(auth.data() + offset), static_cast<int>(size));
+	if (result < 0 || static_cast<size_t>(result) < padding)
+		return false;
+	const size_t length = static_cast<size_t>(result) - padding;
+	if (length > max_decoded)
+		return false;
+
+	const string credentials(reinterpret_cast<const char *>(decoded), length);
+	const size_t separator = credentials.find(':');
+	if (separator == 0 || separator == string::npos ||
+	    credentials.find('\0') != string::npos)
+		return false;
+
+	username = credentials.substr(0, separator);
+	password = credentials.substr(separator + 1);
+	return true;
 }
 
 
@@ -100,11 +133,7 @@ base64Decode(unsigned char* pIn, int inLen, unsigned char* pOut,
 bool
 AuthBasic::handle(const string &auth)
 {
-	if (auth.size() < Rest::AUTH_BASIC.size()) {
-		return false;
-	} else {
-		return (auth.compare(0, Rest::AUTH_BASIC.size(), Rest::AUTH_BASIC) == 0);
-	}
+	return has_basic_scheme(auth);
 }
 
 
@@ -115,29 +144,12 @@ AuthBasic::handle(const string &auth)
 bool
 AuthBasic::authorized(const string &val, Session &session)
 {
-	if (val.size() < (Rest::AUTH_BASIC.size()+1)) {
-		return false;
-	}
-	//now split off "basic"
-	string auth = val.substr(Rest::AUTH_BASIC.size()+1);
-	if (auth.empty() == true) {
+	string username;
+	string password;
+	if (!parse_credentials(val, username, password)) {
 		session.vyatta_debug("AAB");
 		return false;
 	}
-	unsigned char out[1025];
-	int len = 1024;
-	base64Decode((unsigned char*)auth.c_str(),auth.size(),(unsigned char*)&out,len);
-
-	//debug
-	dsyslog(_debug, "%s: auth2: -%s, %d-", __func__, out, len);
-
-	string str_out = string((char*)out);
-	size_t pos = str_out.find(":");
-	if (pos == string::npos) {
-		return false;
-	}
-	string username = str_out.substr(0,pos);
-	string password = str_out.substr(pos+1,len-pos-1);
 
 	session._user = username;
 
@@ -150,9 +162,6 @@ AuthBasic::authorized(const string &val, Session &session)
 		session._service_user = true;
 		session._access_level = Session::k_VYATTASERVICE_USER;
 	}
-
-	//debug
-	dsyslog(_debug, "%s: auth2a: %s, %s", __func__, username.c_str(), password.c_str());
 
 	//now have user and pw--need to  figure out what to do with this...
 
@@ -222,9 +231,9 @@ AuthBasic::authorized(const string &val, Session &session)
 
 	result = pam_authenticate(pam, 0);
 	if (result != PAM_SUCCESS) {
-		dsyslog(_debug, "%s: failed on pam_authenticate for: %s, %s, %d", __func__,
-			username.c_str(), password.c_str(), result);
+		dsyslog(_debug, "%s: pam_authenticate failed: result=%d", __func__, result);
 		session.vyatta_debug("AAH");
+		pam_end(pam, result);
 		free(passwd);
 		return false;
 	}
@@ -233,6 +242,7 @@ AuthBasic::authorized(const string &val, Session &session)
 	if (result != PAM_SUCCESS) {
 		dsyslog(_debug, "%s: pam_acct_mgmt failed: result=%d", __func__, result);
 		session.vyatta_debug("AAI");
+		pam_end(pam, result);
 		free(passwd);
 		return false;
 	}

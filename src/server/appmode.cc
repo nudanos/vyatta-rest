@@ -43,7 +43,6 @@ void
 AppMode::process(Session &session)
 {
 	//  Timer t("AppMode::process()");
-	dsyslog(_debug, "AppMode:%s: _session_key='%s'", __func__, session._session_key.c_str());
 	session.vyatta_debug("XC");
 
 	if (session._auth_type == Rest::AUTH_TYPE_NONE) {
@@ -99,20 +98,10 @@ AppMode::process(Session &session)
 			ERROR(session,Error::APPMODE_SCRIPT_ERROR);
 		}
 	}
-	if (!_debug) {
-		unlink(Rest::JSON_INPUT.c_str());
-	}
+	unlink(Rest::JSON_INPUT.c_str());
 
 	Mode::handle_cmd_output(stdout, session);
 
-	dsyslog(_debug, "AppMode:%s: echo XE: '%s'", __func__, appmodecmd.c_str());
-	session.vyatta_debug("XE:" + appmodecmd);
-	if (_debug) {
-		FILE *fp = fopen(Rest::JSON_INPUT.c_str(), "a");
-		if (fp) {
-			fprintf(fp, "XE: '%s'\n", appmodecmd.c_str());
-			fclose(fp);
-		}
-	}
+	session.vyatta_debug("XE");
 }
 

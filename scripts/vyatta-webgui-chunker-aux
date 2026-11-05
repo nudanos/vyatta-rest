@@ -35,8 +35,17 @@ fi
 
 case $1 in
 	start)
-		mkdir -p /var/run/gui
-		chmod a+rwx /var/run/gui
+		# This directory is an authentication authority, not shared scratch
+		# space. Never repair ownership/mode through a pre-existing link or
+		# trust state left in the former world-writable directory.
+		if [ ! -e /var/run/gui ] && [ ! -L /var/run/gui ]; then
+			mkdir -m 0700 /var/run/gui || exit 1
+		fi
+		if [ -L /var/run/gui ] || [ ! -d /var/run/gui ] ||
+		   [ "$(stat -c '%u:%a' /var/run/gui)" != '0:700' ]; then
+			echo "Unsafe REST session directory /var/run/gui" >&2
+			exit 1
+		fi
 		mkdir -p /run/vyatta-rest
 
 		echo "Starting API PAGER server"

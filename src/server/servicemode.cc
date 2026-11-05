@@ -90,19 +90,10 @@ ServiceMode::execute_service(Session &session, std::string &path)
     ERROR(session,Error::SERVICEMODE_SCRIPT_ERROR);
   }
 
-  if (!_debug) {
-	    unlink(Rest::JSON_INPUT.c_str());
-  }
+  unlink(Rest::JSON_INPUT.c_str());
 
   Mode::handle_cmd_output(cmdout, session);
 
-  if (_debug) {
-    FILE *fp = fopen(Rest::JSON_INPUT.c_str(), "a");
-    if (fp) {
-      fprintf(fp, "XE: '%s'\n", servicecmd.c_str());
-      fclose(fp);
-    }
-  }
 }
 
 string

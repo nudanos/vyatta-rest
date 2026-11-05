@@ -211,7 +211,13 @@ HTTP::dump()
 		} else if (iter->first == Rest::HTTP_REQ_CONTENT_LENGTH) {
 			ret += "req: content_length";
 		} else if (iter->first == Rest::HTTP_REQ_AUTHORIZATION) {
-			ret += "req: authorization";
+			ret += "req: authorization: [redacted]\r\n";
+			++iter;
+			continue;
+		} else if (iter->first == Rest::HTTP_REQ_COOKIE) {
+			ret += "req: cookie: [redacted]\r\n";
+			++iter;
+			continue;
 		} else if (iter->first == Rest::HTTP_BODY) {
 			ret += "body";
 		} else if (iter->first == Rest::HTTP_RESP_DEBUG) {

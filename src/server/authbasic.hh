@@ -30,7 +30,8 @@ public: //methods
 	bool
 	authorized(const std::string &auth, Session &session);
 
-private: //variables
+	static bool parse_credentials(const std::string &auth, std::string &username,
+	                              std::string &password);
 };
 
 #endif //__AUTHBASIC_HH__

@@ -42,19 +42,6 @@ uid_t g_uid;
 gid_t g_gid;
 
 
-static void dump_env(void)
-{
-	static const char envfile[] = "/tmp/environ";
-	FILE *pf;
-
-	pf = fopen(envfile, "w");
-	if (!pf)
-		return;
-	for (unsigned int i = 0; environ[i]; ++i)
-		fprintf(pf, "%s\n", environ[i]);
-	fclose(pf);
-}
-
 static int mkrundir(void)
 {
 	struct stat rundir;
@@ -115,9 +102,6 @@ main(int argc, char* argv[])
 		session._response.set(Rest::HTTP_RESP_CACHE_CONTROL, "no-cache");
 
 		dsyslog(debug, "%s: 1", __func__);
-		if (debug)
-			dump_env();
-
 		dsyslog(debug, "%s: A", __func__);
 		session.vyatta_debug("A");
 
@@ -145,7 +129,7 @@ main(int argc, char* argv[])
 
 		//authorize command here
 		if (auth.validate(session) == false) {
-			dsyslog(debug, "%s: AUTHFAILED: %s", __func__, session._response.serialize().c_str());
+			dsyslog(debug, "%s: AUTHFAILED", __func__);
 
 			if (session._request.get(Rest::HTTP_REQ_URI).find(Rest::APP_REQ_ROOT) != 0) {
 				//non-standard for 401, but allows client application to capture control & redirect
@@ -166,14 +150,6 @@ main(int argc, char* argv[])
 		proc.dispatch(session);
 		out = session._response.serialize();
 		FCGI_fwrite((void *) out.data(), 1, out.length(), FCGI_stdout);
-
-		if (debug) {
-			FILE *fp = fopen("/tmp/rest_out","a");
-			if(fp) {
-				fwrite(out.data(), 1, out.length(), fp);
-				fclose(fp);
-			}
-		}
 
 	done:
 		FCGI_Finish();

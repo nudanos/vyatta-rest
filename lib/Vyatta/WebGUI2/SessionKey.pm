@@ -10,127 +10,103 @@
 use strict;
 use warnings;
 
-use POSIX;
-
-use Data::Dumper;
-use lib '/opt/vyatta/share/perl5';
-use App::MapSimple;
-use App::MsgSimple;
-use NetAddr::IP;
-use Time::HiRes qw(gettimeofday); 
+use Fcntl qw(:DEFAULT :flock :mode);
+use File::Temp qw(tempfile);
 use JSON;
+use Time::HiRes qw(usleep);
 
-
-my $lck_file = "/var/run/gui/session.lck";
-my $tmp_file = "/var/run/gui/session_tmp";
-my $sess_file = "/var/run/gui/session";
+my $session_dir = "/var/run/gui";
+my $lck_file = "$session_dir/session.lck";
+my $sess_file = "$session_dir/session";
 
 sub gen_key
 {
     my ($src_ip) = @_;
+    exit(1) unless defined($src_ip);
 
-    if (!defined($src_ip)) {
-	exit(1); #don't generate, just fail...
-    }
-
-    my @octets = split(/\./, $src_ip);
-
-    my $key;
-    open FH, "/dev/urandom";
-    my $string = <FH>;
-    my @chars = split //,$string;
-    if (!defined($chars[3])) {
-	exit(1);
-    }
-    $key = sprintf("%02X%02X%02X%02X%02X%02X%02X%02X",
-		   $octets[0],$octets[1],$octets[2],$octets[3],
-		   ord($chars[0]),ord($chars[1]),ord($chars[2]),ord($chars[3]));
-    close(FH);
-    return $key;
+    open(my $random, '<:raw', '/dev/urandom') or exit(1);
+    my $bytes;
+    my $count = read($random, $bytes, 8);
+    exit(1) unless defined($count) && $count == 8;
+    close($random) or exit(1);
+    return uc(unpack('H*', $bytes));
 }
 
-sub get_key {
-    my ($name, $access_level, $src_ip) = @_;
+sub _trusted_file
+{
+    my ($file) = @_;
+    my @info = stat($file);
+    return @info && S_ISREG($info[2]) && ($info[2] & 07777) == 0600 &&
+        $info[3] == 1 && $info[4] == 0;
+}
 
-    if (!defined($name) || !defined($src_ip) || $name eq "" || $src_ip eq "") {
-        exit(1);
+sub get_key
+{
+    my ($name, $access_level, $src_ip) = @_;
+    exit(1) unless defined($name) && length($name) &&
+        defined($src_ip) && length($src_ip) && defined($access_level);
+    for my $field ($name, $access_level, $src_ip) {
+        exit(1) if $field =~ /[,\r\n\0]/;
     }
-    
-    ####################################################################
-    ####################################################################
-    #let's try five times before giving up
-    my $try = 5;
-    my $lck_fh;
-    while ($try > 0) {
-        if (sysopen(LCK_FH, $lck_file, O_WRONLY|O_EXCL|O_CREAT)) {
-    	last;
+
+    # /var/run resolves to root-owned /run. Check the final component before
+    # touching files, and validate the open handles without following links.
+    my @dir = lstat($session_dir);
+    exit(1) unless $> == 0 && @dir && S_ISDIR($dir[2]) &&
+        ($dir[2] & 07777) == 0700 && $dir[4] == 0;
+    umask(0077);
+    my $flags = O_RDONLY | O_NOFOLLOW | O_NONBLOCK;
+    sysopen(my $lock, $lck_file, $flags | O_CREAT, 0600) or exit(1);
+    exit(1) unless _trusted_file($lock);
+    my $attempt = 0;
+    until (flock($lock, LOCK_EX | LOCK_NB)) {
+        exit(1) if ++$attempt == 5 || (!$!{EWOULDBLOCK} && !$!{EINTR});
+        usleep(50_000);
+    }
+
+    my $session;
+    if (sysopen($session, $sess_file, $flags)) {
+        exit(1) unless _trusted_file($session);
+    } else {
+        exit(1) unless $!{ENOENT};
+        undef $session;
+    }
+
+    my ($tmp, $tmp_path) = tempfile('session.XXXXXX', DIR => $session_dir, UNLINK => 1);
+    exit(1) unless _trusted_file($tmp);
+    my $now = time;
+    my $key;
+    if ($session) {
+        while (1) {
+            $! = 0;
+            my $line = <$session>;
+            if (!defined($line)) {
+                exit(1) if $!;
+                last;
+            }
+            my @fields = split(/,/, $line, -1);
+            next unless @fields == 5 && length($line) < 1024 && $line =~ /\n\z/;
+            my ($id, $user, $issued, $source) = @fields;
+            next unless $issued =~ /\A[0-9]+\z/ &&
+                $issued <= $now && $now - $issued < 30 * 60;
+            if ($user eq $name && $source eq $src_ip) {
+                $key //= $id if $id =~ /\A[0-9a-fA-F]{16}\z/;
+            } else {
+                print {$tmp} $line or exit(1);
+            }
         }
-        Time::HiRes::usleep(50);
-        $try--;
+        close($session) or exit(1);
     }
-    if ($try == 0) {
-        unlink($lck_file);
-        exit(1);
-    }
-    
-    my $key = "";
-    my $found = "false";
-    #line will be "sessionid,username,timelastaccess,srcip
-    if (sysopen(FH, $sess_file,O_RDWR|O_CREAT, 0666)) {
-        if (sysopen(FH_TMP, $tmp_file,O_RDWR|O_CREAT, 0666)) {
-    	while (<FH>) {
-    	    my $line = $_;
-    	    #check for source ip and username match
-    	    my @session = split(",",$line);
-    	    if ($#session != 4) {
-    		next; #skip not a valid entry
-    	    }
-    	    chop($session[4]);
-    
-    	    if (($name eq $session[1]) && ($src_ip eq $session[3])) {
-    		my ($epochseconds, undef) = gettimeofday;     
-    		$key = $session[0];
-    		print FH_TMP "$session[0],$name,$epochseconds,$src_ip,$access_level\n";
-    		$found = "true"; #found, so let's update time only
-    	    }
-    	    else {
-    		if ($line ne "") {
-    		    print FH_TMP "$line\n";
-    		}
-    	    }
-    	}
-        }
-        else {
-    	unlink($lck_file);
-    	exit(1);
-        }
-    }
-    else {
-        unlink($lck_file);
-        exit(1);
-    }
-    
-    if ($found eq "false") {
-        #webgui 1 uses ip+username to differentiate unique session
-        $key = gen_key($src_ip);
-    #    $key = sprintf("%04X%04X", int(rand(0x10000)), int(rand(0x10000)));
-        my ($epochseconds, undef) = gettimeofday;     
-        print FH_TMP "$key,$name,$epochseconds,$src_ip,$access_level\n"; #create new entry
-    }
-    close(FH_TMP);
-    close(FH);
-    rename($tmp_file,$sess_file);
-    unlink($tmp_file);
-    close(LCK_FH);
-    unlink($lck_file);
-    
-    my $root=();
-    $root->{session}->{user} = $name;
-    $root->{session}->{source} = $src_ip;
-    $root->{session}->{key} = $key;
-    
-    print to_json($root, {pretty => 1});
-    
+    $key //= gen_key($src_ip);
+    my $record = "$key,$name,$now,$src_ip,$access_level\n";
+    exit(1) if length($record) >= 1024;
+    print {$tmp} $record or exit(1);
+    close($tmp) or exit(1);
+    rename($tmp_path, $sess_file) or exit(1);
+    close($lock) or exit(1);
+
+    print to_json({session => { user => $name, source => $src_ip, key => $key }},
+                  {pretty => 1});
     exit(0);
 }
 

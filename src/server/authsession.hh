@@ -12,25 +12,23 @@
 #ifndef __AUTHSESSION_HH__
 #define __AUTHSESSION_HH__
 
-#include <sys/types.h>
-#include <sys/stat.h>
+#include <cstdio>
 #include "http.hh"
 #include "authbase.hh"
 
 class Lock
 {
 public:
-	const static unsigned long _retry_lock_interval;
-	const static unsigned long _retry_lock_count;
-
-public:
 	Lock(const std::string &file);
-	virtual ~Lock();
+	~Lock();
+	Lock(const Lock &) = delete;
+	Lock &operator=(const Lock &) = delete;
 
 	bool
-	status() {
-		return _status;
+	status() const {
+		return _fp && _fp_tmp;
 	}
+	bool commit();
 
 	FILE*
 	get_fp() {
@@ -44,11 +42,11 @@ public:
 
 private:
 	std::string _file;
+	std::string _tmp_file;
 	FILE* _fp;
 	FILE* _fp_tmp;
+	int _dir_fd;
 	int _lck_fd;
-	bool _status;
-	mode_t _mask;
 };
 
 
@@ -59,7 +57,7 @@ public:
 	friend class Authenticate;
 
 public: //methods
-	AuthSession(bool debug);
+	AuthSession(bool debug) : AuthBase(debug) {}
 	virtual ~AuthSession() {}
 
 	bool

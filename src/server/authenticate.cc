@@ -55,7 +55,7 @@ Authenticate::validate(Session &session)
          auth = cookie;
 
 
-	session.vyatta_debug("AAAA:" + auth);
+	session.vyatta_debug("AAAA");
 
 	/*
 	 * here is where we'll identify the authentication scheme
